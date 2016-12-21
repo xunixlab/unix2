@@ -53,31 +53,38 @@ int ServeServer(int sockfd) {
 	uint32_t a = 0;
 	uint32_t b = 1000000000;	
 	int attempt;
+	uint32_t guess = -1;
+	uint32_t add = 0;
     for (attempt = 1; attempt <= MAX_ATTEMPTS; ++attempt) {        
-		uint32_t guess = (b+a)/2;
+		uint32_t newguess = (b+a)/2;
+		if (guess == newguess) guess = newguess + add;
+		else guess = newguess;
 		fprintf(stderr, "a=%d b=%d guess=%d\n", a,b,guess);
 		uint32_t tosend = htonl(guess);
 		if (!SendAll(sockfd, (char*)&tosend, sizeof(tosend))) {
-            break;
+            return 1;
         }
 		char result;
 		if (!RecvAll(sockfd, (char*)&result, sizeof(result))) {
-            break;
+            return 1;
         }		
 		if (result == '=')
 		{
 			fprintf(stderr, "got it!\n");
+			fprintf(stdout, "Answer is %u!\n", guess);
 			return 0;
 		}
 		else if (result == '>')
 		{
 			fprintf(stderr, ">\n");
 			a = guess;
+			add = 1;
 		}
 		else if (result == '<')
 		{
 			fprintf(stderr, "<\n");
 			b = guess;
+			add = -1;
 		}
 		else {
 			fprintf(stderr, "hmmmm, rules are broken.");
@@ -113,8 +120,8 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    printf("Trying to connect...\n");
-
+	fprintf(stderr, "Trying to connect...\n");
+	
     remote.sun_family = AF_UNIX;
     strcpy(remote.sun_path, socketPath);
     len = strlen(remote.sun_path) + sizeof(remote.sun_family);
@@ -123,12 +130,12 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    printf("Connected.\n");
+    fprintf(stderr, "Connected.\n");
 
-	ServeServer(s);
+	int excode = ServeServer(s);
 	if (close(s) == -1) {
 		perror("close socket");
 	}
 
-    return 0;
+    return excode;
 }
